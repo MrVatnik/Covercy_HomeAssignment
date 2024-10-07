@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -32,11 +33,13 @@ namespace Covercy_HomeAssignment.Controllers
         }
 
         [HttpGet("")]
-        public async Task<ActionResult<IEnumerable<ApiTokenDto>>>  GetToken(int? userId)
+        public async Task<ActionResult<IEnumerable<ApiTokenDto>>> GetToken()
         {
 
-            if (userId != null) //replace of authenticateRequest(request)
+            int? userIdFromRequest = authenticateRequest(Request.Query);
+            if (userIdFromRequest != null)//replace of authenticateRequest(request)
             {
+                int userId = (int)userIdFromRequest;
                 List<ApiToken> Result;
                 using (ApplicationContext db = new ApplicationContext())
                 {
@@ -49,36 +52,53 @@ namespace Covercy_HomeAssignment.Controllers
         }
 
         [HttpPost("")]
-        public async Task<ActionResult<ApiTokenDto>> PostToken(int? userId, string? permissions)
+        public async Task<ActionResult<ApiTokenDto>> PostToken()
         {
-            if (userId != null)//replace of authenticateRequest(request)
+            int? userIdFromRequest = authenticateRequest(Request.Query);
+            if (userIdFromRequest != null)//replace of authenticateRequest(request)
             {
-                ApiToken ApiKey = new ApiToken((int)userId, permissions);
-
-                using (ApplicationContext db = new ApplicationContext())
+                int userId = (int)userIdFromRequest;
+                if (Request.Query.ContainsKey("permissions"))
                 {
-                    db.ApiTokens.Add(ApiKey);
-                    db.SaveChanges();
-                }
+                    string permissions = Request.Query.Where(p => p.Key == "permissions").FirstOrDefault().Value;
+                    ApiToken ApiKey = new ApiToken((int)userId, permissions);
 
-                return Ok(new ApiTokenDto(ApiKey));
+                    using (ApplicationContext db = new ApplicationContext())
+                    {
+                        db.ApiTokens.Add(ApiKey);
+                        db.SaveChanges();
+                    }
+
+                    return Ok(new ApiTokenDto(ApiKey));
+                }
             }
             return BadRequest();
         }
 
         [HttpDelete("")]
-        public async Task<ActionResult<ApiTokenDto>> DeleteToken(int? userId, string? ApiKey)
+        public async Task<ActionResult<ApiTokenDto>> DeleteToken() //int? userId, string? ApiKey
         {
-            if (userId != null)//replace of authenticateRequest(request)
+            int? userIdFromRequest = authenticateRequest(Request.Query);
+            if (userIdFromRequest != null)//replace of authenticateRequest(request)
             {
-                ApiToken Key;
-                using (ApplicationContext db = new ApplicationContext())
+                int userId = (int)userIdFromRequest;
+
+                if (Request.Query.ContainsKey("ApiKey"))
                 {
-                    Key = db.ApiTokens.Where(token => token.ApiKey == ApiKey).FirstOrDefault();
-                    Key.IsValid = false;
-                    db.SaveChanges();
+                    string ApiKey = Request.Query.Where(p => p.Key == "ApiKey").FirstOrDefault().Value;
+                    ApiToken Key;
+                    using (ApplicationContext db = new ApplicationContext())
+                    {
+                        Key = db.ApiTokens.Where(token => token.ApiKey == ApiKey).FirstOrDefault();
+                        if (Key != null)
+                        {
+                            Key.IsValid = false;
+                            db.SaveChanges();
+                            return Ok(new ApiTokenDto(Key));
+                        }
+                    }
+                    
                 }
-                return Ok(new ApiTokenDto(Key));
             }
             return BadRequest();
         }
@@ -115,7 +135,19 @@ namespace Covercy_HomeAssignment.Controllers
             return BadRequest("Api Key is Revoked or do not exist");
         }
 
-       
+
+
+        private int? authenticateRequest(IQueryCollection request)
+        {
+            if (request.ContainsKey("userId"))
+            {
+                return Int32.Parse(request.FirstOrDefault(p => p.Key == "userId").Value);
+            }
+            else return null;
+        }
+
+
+
 
     }
 }
