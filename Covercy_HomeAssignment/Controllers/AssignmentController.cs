@@ -141,9 +141,14 @@ namespace Covercy_HomeAssignment.Controllers
         {
             if (request.ContainsKey("userId"))
             {
-                return Int32.Parse(request.FirstOrDefault(p => p.Key == "userId").Value);
+                int ResultID;
+                 if(int.TryParse(request.FirstOrDefault(p => p.Key == "userId").Value,out ResultID))
+                {
+                    return ResultID;
+                }
             }
-            else return null;
+            
+            return null;
         }
 
 
