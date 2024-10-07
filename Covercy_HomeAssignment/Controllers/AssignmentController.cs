@@ -104,30 +104,34 @@ namespace Covercy_HomeAssignment.Controllers
         }
 
         [HttpPost("/authenticate")]
-        public async Task<ActionResult<string>> AuthenticateToken(string? ApiKey)
+        public async Task<ActionResult<string>> AuthenticateToken()
         {
-            if (ApiKey != null)
+            if (Request.Query.ContainsKey("ApiKey"))
             {
-                ApiToken Key;
-                using (ApplicationContext db = new ApplicationContext())
+                string ApiKey = Request.Query.Where(p => p.Key == "ApiKey").FirstOrDefault().Value;
+                if (ApiKey != null)
                 {
-                    Key = db.ApiTokens.Where(token => token.ApiKey == ApiKey).FirstOrDefault();
-                    if (Key.IsValid)
+                    ApiToken Key;
+                    using (ApplicationContext db = new ApplicationContext())
                     {
-                        Key.LastUsage = DateTime.Now;
-                        db.SaveChanges();
+                        Key = db.ApiTokens.Where(token => token.ApiKey == ApiKey).FirstOrDefault();
+                        if (Key.IsValid)
+                        {
+                            Key.LastUsage = DateTime.Now;
+                            db.SaveChanges();
 
 
-                        var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(
-                                                    Configuration.GetSection("SecretKey").Value));          //generating key for signing
-                        var cred = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature); //generating sifning credenttials
-                        JwtSecurityToken JWTtoken = new JwtSecurityToken(                //generating JWT token
-                                    claims: new JWTtokenDto(Key).getClaims(),
-                                    signingCredentials: cred
-                                    );
+                            var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(
+                                                        Configuration.GetSection("SecretKey").Value));          //generating key for signing
+                            var cred = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature); //generating sifning credenttials
+                            JwtSecurityToken JWTtoken = new JwtSecurityToken(                //generating JWT token
+                                        claims: new JWTtokenDto(Key).getClaims(),
+                                        signingCredentials: cred
+                                        );
 
-                        JwtSecurityTokenHandler Handler = new JwtSecurityTokenHandler();
-                        return Ok(Handler.WriteToken(JWTtoken));
+                            JwtSecurityTokenHandler Handler = new JwtSecurityTokenHandler();
+                            return Ok(Handler.WriteToken(JWTtoken));
+                        }
                     }
                 }
             }
